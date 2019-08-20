@@ -5,7 +5,10 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"os"
@@ -18,6 +21,7 @@ import (
 )
 
 var saramaKafkaProtocolVersion = sarama.V0_10_2_0
+var usesTLS = true
 
 type connectorConfig struct {
 	*types.ControllerConfig
@@ -51,7 +55,15 @@ func waitForBrokers(brokers []string, config connectorConfig, controller *types.
 
 	for {
 		if len(controller.Topics()) > 0 {
-			client, err = sarama.NewClient(brokers, nil)
+			bConfig := sarama.NewConfig()
+
+			if usesTLS {
+				tlsConfig := buildTLSConfig()
+				bConfig.Net.TLS.Enable = true
+				bConfig.Net.TLS.Config = tlsConfig
+			}
+
+			client, err = sarama.NewClient(brokers, bConfig)
 			if client != nil && err == nil {
 				break
 			}
@@ -74,6 +86,12 @@ func makeConsumer(brokers []string, config connectorConfig, controller *types.Co
 	cConfig.Group.Return.Notifications = true
 	cConfig.Group.Session.Timeout = 6 * time.Second
 	cConfig.Group.Heartbeat.Interval = 2 * time.Second
+
+	if usesTLS {
+		tlsConfig := buildTLSConfig()
+		cConfig.Net.TLS.Enable = true
+		cConfig.Net.TLS.Config = tlsConfig
+	}
 
 	group := "faas-kafka-queue-workers"
 
@@ -192,4 +210,29 @@ func buildConnectorConfig() connectorConfig {
 		Topics: topics,
 		Broker: broker,
 	}
+}
+
+func buildTLSConfig() *tls.Config {
+	keypair, err := tls.LoadX509KeyPair("../var/tls-secrets/private-cert", "../var/tls-secrets/private-key")
+	if err != nil {
+		usesTLS = false
+		log.Println(err)
+		return nil
+	}
+
+	caCert, err := ioutil.ReadFile("../var/tls-secrets/ca-cert")
+	if err != nil {
+		usesTLS = false
+		log.Println(err)
+		return nil
+	}
+
+	caCertPool := x509.NewCertPool()
+	caCertPool.AppendCertsFromPEM(caCert)
+
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{keypair},
+		RootCAs:      caCertPool,
+	}
+	return tlsConfig
 }

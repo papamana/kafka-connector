@@ -38,7 +38,14 @@ spec:
             - name: auth
               readOnly: true
               mountPath: "/var/secrets/"
+            - name: tls-config
+              readOnly: true
+              mountPath: "/var/tls-secrets/"
       volumes:
       - name: auth
         secret:
           secretName: basic-auth
+      - name: tls-config
+        secret:
+          secretName: tls-config
+          optional: true
