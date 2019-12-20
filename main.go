@@ -213,14 +213,14 @@ func buildConnectorConfig() connectorConfig {
 }
 
 func buildTLSConfig() *tls.Config {
-	keypair, err := tls.LoadX509KeyPair("../var/tls-secrets/private-cert", "../var/tls-secrets/private-key")
+	keypair, err := tls.LoadX509KeyPair("/var/tls-secrets/private-cert", "/var/tls-secrets/private-key")
 	if err != nil {
 		usesTLS = false
 		log.Println(err)
 		return nil
 	}
 
-	caCert, err := ioutil.ReadFile("../var/tls-secrets/ca-cert")
+	caCert, err := ioutil.ReadFile("/var/tls-secrets/ca-cert")
 	if err != nil {
 		usesTLS = false
 		log.Println(err)
